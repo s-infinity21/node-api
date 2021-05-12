@@ -10,6 +10,7 @@ const PORT = process.env.PORT || 3000;
 connectDB();
 
 const bootcamps = require('./routes/bootcamps');
+const courses = require('./routes/courses');
 
 const app = express();
 
@@ -17,6 +18,7 @@ app.use(express.json());
 
 app.use(logger);
 app.use('/api/v1/bootcamps', bootcamps);
+app.use('/api/v1/courses', courses);
 app.use(errHandler);
 
 const server = app.listen(
