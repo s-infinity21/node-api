@@ -2,15 +2,60 @@ const ErrResponse = require('../utility/errorResponse');
 const AsyncHandler = require('../middleware/async');
 const Bootcamp = require('../models/Bootcamp');
 
-exports.getBootCamps = AsyncHandler(async (req, res, next) => {
-	const bootcamp = await Bootcamp.find();
+module.exports.getBootCamps = AsyncHandler(async (req, res, next) => {
+	let query;
+	const reqQuery = { ...req.query };
+	const removeFields = ['select', 'sort', 'page', 'limit'];
+	removeFields.forEach(params => delete reqQuery[params]);
+	let queryStr = JSON.stringify(reqQuery);
+	queryStr = queryStr.replace(/\b(gt|gte|lt|lte|in)\b/g, match => `$${match}`);
+	query = Bootcamp.find(JSON.parse(queryStr));
+
+	if (req.query.select) {
+		const fields = req.query.select.split(',').join(' ');
+		query = query.select(fields);
+	}
+
+	if (req.query.sort) {
+		const sortBy = req.query.sort.split(',').join(' ');
+		query = query.sort(sortBy);
+	} else {
+		query = query.sort('-createdAt');
+	}
+
+	const page = parseInt(req.query.page, 10) || 1;
+	const limit = parseInt(req.query.limit, 10) || 25;
+	const startIndex = (page - 1) * limit;
+	const endIndex = page * limit;
+	const total = await Bootcamp.countDocuments();
+
+	query = query.skip(startIndex).limit(limit);
+
+	const bootcamp = await query; //filtering values
+
+	const pagination = {};
+	if (endIndex < total) {
+		pagination.next = {
+			page: page + 1,
+			limit
+		};
+	}
+	if (startIndex > 0) {
+		pagination.prev = {
+			page: page - 1,
+			limit
+		};
+	}
+
 	res.status(200).json({
 		success: true,
-		data: bootcamp
+		pagination,
+		data: bootcamp,
+		count: bootcamp.length
 	});
 });
 
-exports.getBootCamp = AsyncHandler(async (req, res, next) => {
+module.exports.getBootCamp = AsyncHandler(async (req, res, next) => {
 	const bootcamp = await Bootcamp.findById(req.params.id);
 	if (!bootcamp) {
 		return next(
@@ -23,7 +68,7 @@ exports.getBootCamp = AsyncHandler(async (req, res, next) => {
 	});
 });
 
-exports.createBootCamp = AsyncHandler(async (req, res, next) => {
+module.exports.createBootCamp = AsyncHandler(async (req, res, next) => {
 	const bootcamp = await Bootcamp.create(req.body);
 	res.status(201).json({
 		success: true,
@@ -31,7 +76,7 @@ exports.createBootCamp = AsyncHandler(async (req, res, next) => {
 	});
 });
 
-exports.updateBootCamp = AsyncHandler(async (req, res, next) => {
+module.exports.updateBootCamp = AsyncHandler(async (req, res, next) => {
 	const bootcamp = await Bootcamp.findByIdAndUpdate(req.params.id, req.body, {
 		new: true,
 		runValidators: true
@@ -49,7 +94,7 @@ exports.updateBootCamp = AsyncHandler(async (req, res, next) => {
 	});
 });
 
-exports.deleteBootCamp = AsyncHandler(async (req, res, next) => {
+module.exports.deleteBootCamp = AsyncHandler(async (req, res, next) => {
 	const bootcamp = await Bootcamp.findByIdAndDelete(req.params.id);
 	if (!bootcamp) {
 		return next(
